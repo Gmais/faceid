@@ -440,7 +440,19 @@
 </main>
 
 <script>
-  const API = '';
+  // Backend: mesmo servidor quando aberto direto; na Vercel usa a URL do túnel (?api=URL, salva no navegador).
+  const API = (() => {
+    const q = new URLSearchParams(location.search).get('api');
+    try {
+      if (q) localStorage.setItem('api_base', q);
+      let base = localStorage.getItem('api_base') || '';
+      if (!base && !['localhost', '127.0.0.1'].includes(location.hostname) && !/^192\.168\./.test(location.hostname)) {
+        base = prompt('Cole a URL do túnel do seu PC (ex.: https://algo.trycloudflare.com):') || '';
+        if (base) localStorage.setItem('api_base', base);
+      }
+      return base.replace(/\/+$/, '');
+    } catch (_) { return ''; }
+  })();
   let state = {
     sourcePath: null,
     targetPath: null, targetIsVideo: false,
