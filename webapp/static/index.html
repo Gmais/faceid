@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FaceSwap Studio</title>
+  <style>
+    :root {
+      --bg:       #0d0d12;
+      --surface:  #16161f;
+      --card:     #1e1e2a;
+      --border:   #2c2c3e;
+      --accent:   #7c6af7;
+      --accent2:  #f76aab;
+      --green:    #4ade80;
+      --red:      #f87171;
+      --yellow:   #fbbf24;
+      --text:     #e2e2f0;
+      --muted:    #6b6b8a;
+      --radius:   14px;
+      --radius-sm:8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    header .logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    header .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .cuda-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 10px;
+      border-radius: 99px; display: none;
+    }
+    .cuda-badge.on  { background: rgba(74,222,128,0.15); color: var(--green); display: inline-flex; }
+    .cuda-badge.off { background: rgba(107,107,138,0.15); color: var(--muted); display: inline-flex; }
+    header span.sub { color: var(--muted); font-size: 13px; }
+
+    /* ── Layout ── */
+    main {
+      max-width: 960px;
+      margin: 40px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* ── Upload grid ── */
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 600px) { .upload-grid { grid-template-columns: 1fr; } }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(124,106,247,0.06);
+    }
+    .drop-zone.filled { border-color: var(--green); border-style: solid; }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-icon { font-size: 36px; line-height: 1; }
+    .drop-label { font-size: 14px; font-weight: 600; }
+    .drop-hint { font-size: 12px; color: var(--muted); }
+    .drop-preview {
+      max-width: 100%; max-height: 120px;
+      border-radius: var(--radius-sm); object-fit: cover; display: none;
+    }
+    .drop-filename {
+      font-size: 12px; color: var(--green);
+      max-width: 180px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; display: none;
+    }
+    .drop-zone.filled .drop-icon,
+    .drop-zone.filled .drop-label,
+    .drop-zone.filled .drop-hint { display: none; }
+    .drop-zone.filled .drop-preview { display: block; }
+    .drop-zone.filled .drop-filename { display: block; }
+    .drop-change {
+      font-size: 11px; color: var(--muted); cursor: pointer;
+      text-decoration: underline; display: none;
+    }
+    .drop-zone.filled .drop-change { display: block; }
+
+    /* ── Trim ── */
+    .trim-row {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+    }
+    .trim-row .label-sm { font-size: 12px; color: var(--muted); }
+    .time-input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
+      padding: 6px 10px; width: 80px; outline: none;
+    }
+    .time-input:focus { border-color: var(--accent); }
+    .duration-chip {
+      font-size: 11px; color: var(--muted);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: 3px 10px;
+    }
+
+    /* ── Face grid ── */
+    #face-section { display: none; }
+    .face-grid {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; min-height: 24px;
+    }
+    .face-thumb {
+      width: 90px; height: 90px; border-radius: var(--radius-sm);
+      object-fit: cover; cursor: pointer; border: 3px solid transparent;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .face-thumb:hover  { border-color: var(--accent); transform: scale(1.05); }
+    .face-thumb.active { border-color: var(--green); box-shadow: 0 0 0 2px rgba(74,222,128,0.3); }
+    .face-detect-bar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .face-scan-input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
+      padding: 6px 10px; width: 70px; outline: none;
+    }
+    .face-scan-input:focus { border-color: var(--accent); }
+    #face-hint { font-size: 12px; color: var(--muted); }
+    #selected-face-info {
+      font-size: 12px; color: var(--green); display: none;
+    }
+
+    /* ── Options ── */
+    .options-row {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .toggle-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toggle {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      user-select: none; transition: all 0.15s; background: var(--surface);
+    }
+    .toggle.active { border-color: var(--accent); background: rgba(124,106,247,0.12); color: #a898ff; }
+    .toggle.active-green { border-color: var(--green); background: rgba(74,222,128,0.12); color: var(--green); }
+    .toggle input { display: none; }
+
+    .select-field {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
+      padding: 6px 12px; cursor: pointer; outline: none;
+    }
+    .select-field:focus { border-color: var(--accent); }
+
+    .label-sm { font-size: 12px; color: var(--muted); margin-right: 4px; }
+
+    /* ── Button ── */
+    .btn {
+      padding: 10px 22px; border-radius: var(--radius-sm); border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--accent); }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+    /* ── Progress section ── */
+    #progress-section { display: none; }
+    .progress-bar-wrap { background: var(--surface); border-radius: 99px; height: 10px; overflow: hidden; margin-bottom: 8px; }
+    .progress-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease; width: 0%;
+    }
+    .progress-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+    }
+    .status-badge.processing { background: rgba(124,106,247,0.15); color: var(--accent); }
+    .status-badge.completed  { background: rgba(74,222,128,0.15);  color: var(--green); }
+    .status-badge.failed     { background: rgba(248,113,113,0.15); color: var(--red); }
+    .status-badge.queued     { background: rgba(251,191,36,0.15);  color: var(--yellow); }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Log terminal ── */
+    .log-box {
+      background: #0a0a0e; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px 14px; max-height: 180px; overflow-y: auto;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 11.5px; line-height: 1.6; color: #8888aa;
+    }
+    .log-line { word-break: break-all; }
+    .log-line.info  { color: #8888aa; }
+    .log-line.ok    { color: var(--green); }
+    .log-line.warn  { color: var(--yellow); }
+    .log-line.error { color: var(--red); }
+
+    /* ── Result ── */
+    #result-section { display: none; }
+    .result-media { width: 100%; max-height: 360px; border-radius: var(--radius-sm); object-fit: contain; background: #000; }
+    .result-actions { display: flex; gap: 12px; margin-top: 16px; }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3);
+      border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13px;
+      color: var(--red); display: none; margin-top: 12px;
+    }
+
+    /* ── Spinner ── */
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .upload-spinner { display: none; }
+    .uploading .upload-spinner { display: inline-flex; }
+    .uploading .drop-zone { pointer-events: none; opacity: 0.6; }
+
+    /* ── Divider ── */
+    .options-divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎭</div>
+  <h1>FaceSwap Studio</h1>
+  <div class="header-right">
+    <span class="cuda-badge" id="cuda-badge">GPU</span>
+    <span class="sub">Powered by FaceFusion · Dados excluídos em 2h</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- 1 — Arquivos -->
+  <div class="card">
+    <div class="card-title">1 — Arquivos</div>
+    <div class="upload-grid">
+
+      <div id="source-wrap">
+        <p style="font-size:13px;font-weight:600;margin-bottom:8px;">Rosto Fonte <span style="color:var(--red)">*</span></p>
+        <div class="drop-zone" id="source-drop" onclick="document.getElementById('source-input').click()">
+          <input type="file" id="source-input" accept=".jpg,.jpeg,.png,.webp" />
+          <span class="drop-icon">🖼️</span>
+          <span class="drop-label">Arraste ou clique</span>
+          <span class="drop-hint">PNG, JPG, WEBP</span>
+          <img class="drop-preview" id="source-preview" />
+          <span class="drop-filename" id="source-filename"></span>
+          <span class="drop-change" onclick="resetFile('source')">Trocar arquivo</span>
+        </div>
+        <div class="upload-spinner" id="source-spinner" style="margin-top:6px;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
+          <span class="spinner"></span> Enviando…
+        </div>
+      </div>
+
+      <div id="target-wrap">
+        <p style="font-size:13px;font-weight:600;margin-bottom:8px;">Alvo (Imagem ou Vídeo) <span style="color:var(--red)">*</span></p>
+        <div class="drop-zone" id="target-drop" onclick="document.getElementById('target-input').click()">
+          <input type="file" id="target-input" accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.avi,.webm,.mkv" />
+          <span class="drop-icon">🎬</span>
+          <span class="drop-label">Arraste ou clique</span>
+          <span class="drop-hint">Imagem ou Vídeo</span>
+          <img   class="drop-preview" id="target-preview-img" style="display:none" />
+          <video class="drop-preview" id="target-preview-vid" muted style="display:none"></video>
+          <span class="drop-filename" id="target-filename"></span>
+          <span class="drop-change" onclick="resetFile('target')">Trocar arquivo</span>
+        </div>
+        <div class="upload-spinner" id="target-spinner" style="margin-top:6px;gap:6px;align-items:center;font-size:12px;color:var(--muted)">
+          <span class="spinner"></span> Enviando…
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Trim (vídeo only) -->
+    <div id="trim-section" style="display:none">
+      <div class="trim-row">
+        <span class="label-sm">✂ Recorte:</span>
+        <span class="duration-chip" id="duration-chip">—</span>
+        <span class="label-sm">De</span>
+        <input type="number" class="time-input" id="trim-start" min="0" step="0.1" placeholder="0s" />
+        <span class="label-sm">até</span>
+        <input type="number" class="time-input" id="trim-end"   min="0" step="0.1" placeholder="fim" />
+        <span class="label-sm">segundos</span>
+        <button class="btn btn-secondary btn-sm" onclick="clearTrim()" style="margin-left:auto">Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 — Selecionar rosto no vídeo -->
+  <div class="card" id="face-section">
+    <div class="card-title">2 — Rosto a Substituir no Vídeo</div>
+    <div class="face-detect-bar">
+      <button class="btn btn-secondary btn-sm" id="detect-btn" onclick="detectFaces()">🔍 Detectar Rostos</button>
+      <span class="label-sm">no segundo</span>
+      <input type="number" class="face-scan-input" id="scan-second" min="0" step="1" placeholder="auto" />
+      <span id="face-hint">Detecta rostos disponíveis no vídeo para escolher qual substituir</span>
+    </div>
+    <div class="options-row" style="margin:10px 0">
+      <span class="label-sm">Modo:</span>
+      <select class="select-field" id="swap-mode" onchange="setSwapMode(this.value)">
+        <option value="single">Um rosto (usa o Rosto Fonte)</option>
+        <option value="multi">Vários rostos (um substituto para cada pessoa)</option>
+      </select>
+    </div>
+    <div class="face-grid" id="face-grid"></div>
+    <div id="pairs-box" style="display:none;margin-top:12px">
+      <p class="label-sm" style="margin-bottom:8px">Clique num rosto detectado para adicioná-lo e envie o rosto substituto de cada pessoa:</p>
+      <div id="pairs-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div id="selected-face-info">✓ Rosto selecionado — modo referência ativado</div>
+  </div>
+
+  <!-- 3 — Opções -->
+  <div class="card">
+    <div class="card-title" id="options-number">3 — Opções</div>
+    <div class="options-row">
+      <span class="label-sm">Processadores:</span>
+      <div class="toggle-group">
+        <label class="toggle active" id="tog-swapper">
+          <input type="checkbox" checked value="face_swapper" /> 🔄 Face Swap
+        </label>
+        <label class="toggle active" id="tog-enhancer">
+          <input type="checkbox" checked value="face_enhancer" /> ✨ Melhoria
+        </label>
+        <label class="toggle" id="tog-bg">
+          <input type="checkbox" value="background_remover" /> 🎭 Remover BG
+        </label>
+      </div>
+
+      <div class="options-divider"></div>
+
+      <span class="label-sm">Seleção:</span>
+      <select class="select-field" id="face-mode">
+        <option value="one">Um rosto</option>
+        <option value="many">Todos os rostos</option>
+        <option value="reference">Por referência</option>
+      </select>
+
+      <div class="options-divider"></div>
+
+      <span class="label-sm">Velocidade:</span>
+      <div class="toggle-group">
+        <label class="toggle active-green" id="tog-quality" onclick="setSpeed('quality')">
+          <input type="radio" name="speed" value="quality" checked /> 🎯 Qualidade
+        </label>
+        <label class="toggle" id="tog-fast" onclick="setSpeed('fast')">
+          <input type="radio" name="speed" value="fast" /> ⚡ Rápido
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action -->
+  <div style="display:flex;align-items:center;gap:12px">
+    <button class="btn btn-primary" id="start-btn" disabled onclick="startJob()" style="padding:12px 28px;font-size:15px">
+      Processar
+    </button>
+    <span id="action-hint" style="font-size:13px;color:var(--muted)">Envie os dois arquivos para continuar</span>
+  </div>
+
+  <!-- Progress -->
+  <div class="card" id="progress-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="card-title" style="margin:0" id="progress-number">4 — Processamento</div>
+      <span id="status-badge" class="status-badge queued"><span class="pulse"></span> Aguardando</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="prog-fill"></div>
+    </div>
+    <div class="progress-info">
+      <span id="prog-label">0%</span>
+      <span id="prog-step">—</span>
+    </div>
+    <div class="log-box" id="log-box"></div>
+    <div class="error-banner" id="error-banner"></div>
+  </div>
+
+  <!-- Result -->
+  <div class="card" id="result-section">
+    <div class="card-title" id="result-number">5 — Resultado</div>
+    <video class="result-media" id="result-video" controls style="display:none"></video>
+    <img   class="result-media" id="result-img"             style="display:none" />
+    <div class="result-actions">
+      <a id="download-link" class="btn btn-primary" download>⬇ Baixar Resultado</a>
+      <button class="btn btn-secondary" onclick="resetAll()">Nova Troca</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const API = '';
+  let state = {
+    sourcePath: null,
+    targetPath: null, targetIsVideo: false,
+    targetFps: 25, targetDuration: 0, targetTotalFrames: 0,
+    selectedFacePosition: null, selectedFrameNumber: null,
+    swapMode: 'single', pairs: [],
+    speedMode: 'quality',
+    jobId: null, evtSource: null,
+  };
+
+  // ── Server status ──
+  fetch(`${API}/api/status`).then(r => r.json()).then(d => {
+    const badge = document.getElementById('cuda-badge');
+    if (d.cuda) { badge.textContent = '⚡ GPU'; badge.className = 'cuda-badge on'; }
+    else         { badge.textContent = 'CPU';   badge.className = 'cuda-badge off'; }
+  }).catch(() => {});
+
+  // ── Drag & drop ──
+  ['source', 'target'].forEach(kind => {
+    const zone = document.getElementById(`${kind}-drop`);
+    zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(kind, file);
+    });
+    document.getElementById(`${kind}-input`).addEventListener('change', e => {
+      if (e.target.files[0]) handleFile(kind, e.target.files[0]);
+    });
+  });
+
+  async function handleFile(kind, file) {
+    const wrap    = document.getElementById(`${kind}-wrap`);
+    const spinner = document.getElementById(`${kind}-spinner`);
+    wrap.classList.add('uploading');
+    spinner.style.display = 'flex';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch(`${API}/api/upload/${kind}`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || 'Erro no upload');
+        return;
+      }
+      const data = await res.json();
+
+      if (kind === 'source') {
+        state.sourcePath = data.path;
+        showPreview('source', file, false);
+        document.getElementById('source-filename').textContent = file.name;
+        document.getElementById('source-drop').classList.add('filled');
+      } else {
+        state.targetPath   = data.path;
+        state.targetIsVideo = data.is_video;
+        showPreview('target', file, data.is_video);
+        document.getElementById('target-filename').textContent = file.name;
+        document.getElementById('target-drop').classList.add('filled');
+        resetFaceSelection();
+        if (data.is_video) {
+          await loadVideoInfo(data.path);
+          document.getElementById('trim-section').style.display = 'block';
+          document.getElementById('face-section').style.display = 'block';
+          updateStepNumbers(true);
+        } else {
+          document.getElementById('trim-section').style.display = 'none';
+          document.getElementById('face-section').style.display = 'none';
+          updateStepNumbers(false);
+        }
+      }
+      checkReady();
+    } catch(e) {
+      alert('Falha no upload: ' + e.message);
+    } finally {
+      wrap.classList.remove('uploading');
+      spinner.style.display = 'none';
+    }
+  }
+
+  function updateStepNumbers(hasVideo) {
+    document.getElementById('options-number').textContent  = hasVideo ? '3 — Opções'        : '2 — Opções';
+    document.getElementById('progress-number').textContent = hasVideo ? '4 — Processamento'  : '3 — Processamento';
+    document.getElementById('result-number').textContent   = hasVideo ? '5 — Resultado'      : '4 — Resultado';
+  }
+
+  async function loadVideoInfo(path) {
+    try {
+      const res = await fetch(`${API}/api/video-info?path=${encodeURIComponent(path)}`);
+      if (!res.ok) return;
+      const d = await res.json();
+      state.targetFps         = d.fps;
+      state.targetDuration    = d.duration;
+      state.targetTotalFrames = d.total_frames;
+      document.getElementById('duration-chip').textContent =
+        `${fmtTime(d.duration)}  (${d.total_frames} frames · ${d.fps.toFixed(0)} fps)`;
+      document.getElementById('trim-end').placeholder = fmtTime(d.duration);
+      document.getElementById('trim-end').max = d.duration;
+      document.getElementById('trim-start').max = d.duration;
+      document.getElementById('scan-second').max = Math.floor(d.duration);
+    } catch(_) {}
+  }
+
+  function fmtTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = (sec % 60).toFixed(1).padStart(4, '0');
+    return m > 0 ? `${m}m${s}s` : `${s}s`;
+  }
+
+  function clearTrim() {
+    document.getElementById('trim-start').value = '';
+    document.getElementById('trim-end').value   = '';
+  }
+
+  // ── Face detection ──
+  async function detectFaces() {
+    if (!state.targetPath) return;
+    const btn = document.getElementById('detect-btn');
+    const hint = document.getElementById('face-hint');
+    const grid = document.getElementById('face-grid');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    hint.textContent = 'Detectando…';
+    grid.innerHTML = '';
+
+    const scanSec = parseFloat(document.getElementById('scan-second').value);
+    let frameNumber = null;
+    if (!isNaN(scanSec) && scanSec >= 0) {
+      frameNumber = Math.round(scanSec * state.targetFps);
+    }
+
+    try {
+      const res = await fetch(`${API}/api/detect-faces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_path: state.targetPath, frame_number: frameNumber }),
+      });
+      const data = await res.json();
+
+      if (!data.faces || data.faces.length === 0) {
+        hint.textContent = 'Nenhum rosto detectado neste trecho. Tente outro segundo.';
+        btn.disabled = false;
+        btn.textContent = '🔍 Detectar Rostos';
+        return;
+      }
+
+      hint.textContent = `${data.faces.length} rosto(s) encontrado(s) — clique para escolher qual substituir`;
+      data.faces.forEach(face => {
+        const img = document.createElement('img');
+        img.src = face.thumbnail;
+        img.className = 'face-thumb';
+        img.title = `Rosto ${face.position + 1}`;
+        img.addEventListener('click', () => state.swapMode === 'multi'
+          ? addPair(img, face) : selectFace(img, face.position, face.frame_number));
+        grid.appendChild(img);
+      });
+    } catch(e) {
+      hint.textContent = 'Erro na detecção: ' + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Detectar Rostos';
+    }
+  }
+
+  function selectFace(imgEl, position, frameNumber) {
+    document.querySelectorAll('.face-thumb').forEach(t => t.classList.remove('active'));
+    imgEl.classList.add('active');
+    state.selectedFacePosition = position;
+    state.selectedFrameNumber  = frameNumber;
+    document.getElementById('selected-face-info').style.display = 'block';
+    document.getElementById('selected-face-info').textContent =
+      `✓ Rosto ${position + 1} selecionado (frame ${frameNumber}) — modo referência ativado`;
+  }
+
+  function resetFaceSelection() {
+    state.selectedFacePosition = null;
+    state.selectedFrameNumber  = null;
+    state.pairs = [];
+    document.getElementById('pairs-list').innerHTML = '';
+    document.getElementById('face-grid').innerHTML = '';
+    document.getElementById('face-hint').textContent = 'Detecta rostos disponíveis no vídeo para escolher qual substituir';
+    document.getElementById('selected-face-info').style.display = 'none';
+  }
+
+  // ── Modo vários rostos ──
+  function setSwapMode(mode) {
+    state.swapMode = mode;
+    const multi = mode === 'multi';
+    document.getElementById('pairs-box').style.display = multi ? 'block' : 'none';
+    document.getElementById('source-wrap').style.opacity = multi ? '0.4' : '1';
+    document.getElementById('face-mode').disabled = multi;
+    document.querySelectorAll('.face-thumb').forEach(t => t.classList.remove('active'));
+    state.selectedFacePosition = null; state.selectedFrameNumber = null;
+    document.getElementById('selected-face-info').style.display = 'none';
+    checkReady();
+  }
+
+  function addPair(imgEl, face) {
+    if (state.pairs.some(p => p.position === face.position && p.frame === face.frame_number)) return;
+    imgEl.classList.add('active');
+    state.pairs.push({ position: face.position, frame: face.frame_number, thumb: face.thumbnail, sourcePath: null, el: imgEl });
+    renderPairs();
+  }
+
+  function removePair(i) {
+    const [p] = state.pairs.splice(i, 1);
+    if (p.el) p.el.classList.remove('active');
+    renderPairs();
+  }
+
+  async function uploadPairSource(i, file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${API}/api/upload/source`, { method: 'POST', body: fd });
+    if (!res.ok) { alert((await res.json()).detail || 'Erro no upload'); return; }
+    state.pairs[i].sourcePath = (await res.json()).path;
+    state.pairs[i].sourceName = file.name;
+    renderPairs();
+  }
+
+  function renderPairs() {
+    const list = document.getElementById('pairs-list');
+    list.innerHTML = '';
+    state.pairs.forEach((p, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px';
+      row.innerHTML = `<img src="${p.thumb}" style="width:56px;height:56px;border-radius:8px;object-fit:cover">
+        <span class="label-sm">Rosto ${p.position + 1} (frame ${p.frame}) →</span>`;
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = '.jpg,.jpeg,.png,.webp';
+      inp.addEventListener('change', e => e.target.files[0] && uploadPairSource(i, e.target.files[0]));
+      row.appendChild(inp);
+      if (p.sourcePath) { const ok = document.createElement('span'); ok.textContent = '✓ ' + (p.sourceName || ''); ok.className = 'label-sm'; row.appendChild(ok); }
+      const rm = document.createElement('button');
+      rm.className = 'btn btn-secondary btn-sm'; rm.textContent = '✕'; rm.onclick = () => removePair(i);
+      row.appendChild(rm);
+      list.appendChild(row);
+    });
+    checkReady();
+  }
+
+  // ── Speed toggle ──
+  function setSpeed(mode) {
+    state.speedMode = mode;
+    document.getElementById('tog-quality').classList.toggle('active-green', mode === 'quality');
+    document.getElementById('tog-quality').classList.toggle('active',       false);
+    document.getElementById('tog-fast').classList.toggle('active-green',    mode === 'fast');
+    document.getElementById('tog-fast').classList.toggle('active',          false);
+  }
+
+  function showPreview(kind, file, isVideo) {
+    const url = URL.createObjectURL(file);
+    if (kind === 'source') {
+      document.getElementById('source-preview').src = url;
+    } else {
+      if (isVideo) {
+        const v = document.getElementById('target-preview-vid');
+        v.src = url; v.style.display = 'block';
+        document.getElementById('target-preview-img').style.display = 'none';
+      } else {
+        const i = document.getElementById('target-preview-img');
+        i.src = url; i.style.display = 'block';
+        document.getElementById('target-preview-vid').style.display = 'none';
+      }
+    }
+  }
+
+  function resetFile(kind) {
+    event.stopPropagation();
+    if (kind === 'source') {
+      state.sourcePath = null;
+      document.getElementById('source-drop').classList.remove('filled');
+      document.getElementById('source-preview').src = '';
+      document.getElementById('source-input').value = '';
+    } else {
+      state.targetPath     = null;
+      state.targetIsVideo  = false;
+      state.targetDuration = 0;
+      document.getElementById('target-drop').classList.remove('filled');
+      document.getElementById('target-preview-img').src = '';
+      document.getElementById('target-preview-vid').src = '';
+      document.getElementById('target-input').value = '';
+      document.getElementById('trim-section').style.display = 'none';
+      document.getElementById('face-section').style.display = 'none';
+      updateStepNumbers(false);
+      clearTrim();
+      resetFaceSelection();
+    }
+    checkReady();
+  }
+
+  function checkReady() {
+    const multi = state.swapMode === 'multi';
+    const ok = multi
+      ? state.targetPath && state.pairs.length > 0 && state.pairs.every(p => p.sourcePath)
+      : state.sourcePath && state.targetPath;
+    document.getElementById('start-btn').disabled = !ok;
+    document.getElementById('action-hint').textContent = ok
+      ? 'Pronto para processar!'
+      : multi ? 'Envie o vídeo, detecte os rostos e envie um substituto para cada um'
+              : 'Envie os dois arquivos para continuar';
+  }
+
+  // ── Processor toggles ──
+  document.querySelectorAll('.toggle-group .toggle:not(#tog-quality):not(#tog-fast)').forEach(lbl => {
+    lbl.addEventListener('click', () => {
+      const inp = lbl.querySelector('input[type=checkbox]');
+      if (!inp) return;
+      inp.checked = !inp.checked;
+      lbl.classList.toggle('active', inp.checked);
+    });
+  });
+
+  function getProcessors() {
+    return [...document.querySelectorAll('.toggle input[type=checkbox]:checked')].map(i => i.value);
+  }
+
+  // ── Start job ──
+  async function startJob() {
+    const processors = getProcessors();
+    if (!processors.length) { alert('Selecione ao menos um processador'); return; }
+
+    const trimStartVal = parseFloat(document.getElementById('trim-start').value);
+    const trimEndVal   = parseFloat(document.getElementById('trim-end').value);
+    const trimStart = isNaN(trimStartVal) ? null : trimStartVal;
+    const trimEnd   = isNaN(trimEndVal)   ? null : trimEndVal;
+
+    document.getElementById('start-btn').disabled = true;
+    document.getElementById('progress-section').style.display = 'block';
+    document.getElementById('result-section').style.display   = 'none';
+    document.getElementById('error-banner').style.display     = 'none';
+    document.getElementById('log-box').innerHTML = '';
+    setStatus('queued');
+    updateProgress(0, 'Criando job…');
+
+    const body = {
+      source_path: state.sourcePath,
+      target_path: state.targetPath,
+      processors,
+      face_selector_mode: document.getElementById('face-mode').value,
+      speed_mode: state.speedMode,
+      trim_start_sec: trimStart,
+      trim_end_sec:   trimEnd,
+      reference_face_position: state.selectedFacePosition,
+      reference_frame_number:  state.selectedFrameNumber,
+    };
+    if (state.swapMode === 'multi') {
+      body.pairs = state.pairs.map(p => ({
+        source_path: p.sourcePath,
+        reference_face_position: p.position,
+        reference_frame_number: p.frame,
+      }));
+    }
+
+    const res = await fetch(`${API}/api/jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      const d = err.detail;
+      showError(d && d.code === 'DURATION_EXCEEDED'
+        ? `Vídeo acima do limite de ${d.max_seconds}s — use o recorte.`
+        : (typeof d === 'string' ? d : 'Erro ao criar job'));
+      return;
+    }
+
+    const { job_id } = await res.json();
+    state.jobId = job_id;
+    listenEvents(job_id);
+    document.getElementById('progress-section').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function listenEvents(jobId) {
+    if (state.evtSource) state.evtSource.close();
+    state.evtSource = new EventSource(`${API}/api/jobs/${jobId}/events`);
+    state.evtSource.onmessage = e => {
+      const d = JSON.parse(e.data);
+      setStatus(d.status);
+      updateProgress(d.progress, queueLabel(d));
+      if (d.logs?.length) appendLogs(d.logs);
+      if (d.status === 'completed') { state.evtSource.close(); showResult(jobId); }
+      if (d.status === 'failed')    { state.evtSource.close(); showError(d.error || 'Falha'); }
+    };
+    state.evtSource.onerror = () => { state.evtSource.close(); pollFallback(jobId); };
+  }
+
+  async function pollFallback(jobId) {
+    while (true) {
+      await sleep(1500);
+      const res = await fetch(`${API}/api/jobs/${jobId}`);
+      if (!res.ok) break;
+      const d = await res.json();
+      setStatus(d.status);
+      updateProgress(d.progress, queueLabel(d));
+      if (d.logs?.length) appendLogs(d.logs.slice(-10));
+      if (d.status === 'completed') { showResult(jobId); break; }
+      if (d.status === 'failed')    { showError(d.error); break; }
+    }
+  }
+
+  function queueLabel(d) {
+    return d.status === 'queued' && d.queue_position > 0 ? `Na fila — posição ${d.queue_position}` : statusLabel(d.status);
+  }
+
+  function statusLabel(s) {
+    return { queued:'Na fila…', processing:'Processando…', completed:'Concluído!', failed:'Falhou' }[s] || s;
+  }
+
+  function setStatus(s) {
+    const b = document.getElementById('status-badge');
+    b.className = `status-badge ${s}`;
+    b.innerHTML = `<span class="pulse"></span> ${statusLabel(s)}`;
+  }
+
+  function updateProgress(pct, label) {
+    document.getElementById('prog-fill').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = pct + '%';
+    if (label) document.getElementById('prog-step').textContent = label;
+  }
+
+  function appendLogs(lines) {
+    const box = document.getElementById('log-box');
+    lines.forEach(line => {
+      const div = document.createElement('div');
+      div.className = 'log-line ' + classifyLog(line);
+      div.textContent = line;
+      box.appendChild(div);
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function classifyLog(line) {
+    const u = line.toUpperCase();
+    if (u.includes('ERROR') || u.includes('ERRO')) return 'error';
+    if (u.includes('WARN'))                         return 'warn';
+    if (u.includes('DONE') || u.includes('COMPLETE') || u.includes('SUCCESS')) return 'ok';
+    return 'info';
+  }
+
+  function showError(msg) {
+    const b = document.getElementById('error-banner');
+    b.textContent = '⚠ ' + msg;
+    b.style.display = 'block';
+    setStatus('failed');
+    document.getElementById('start-btn').disabled = false;
+  }
+
+  async function showResult(jobId) {
+    updateProgress(100, 'Concluído!');
+    document.getElementById('result-section').style.display = 'block';
+    const suffix = state.targetIsVideo ? '.mp4' : '.jpg';
+    const dl = document.getElementById('download-link');
+    dl.href     = `${API}/api/jobs/${jobId}/result`;
+    dl.download = `faceswap_${jobId.slice(0, 8)}${suffix}`;
+    if (state.targetIsVideo) {
+      const v = document.getElementById('result-video');
+      v.src = `${API}/api/jobs/${jobId}/result`;
+      v.style.display = 'block';
+      document.getElementById('result-img').style.display = 'none';
+    } else {
+      const i = document.getElementById('result-img');
+      i.src = `${API}/api/jobs/${jobId}/result`;
+      i.style.display = 'block';
+      document.getElementById('result-video').style.display = 'none';
+    }
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function resetAll() {
+    if (state.jobId) fetch(`${API}/api/jobs/${state.jobId}`, { method: 'DELETE' }).catch(() => {});
+    if (state.evtSource) state.evtSource.close();
+    state = {
+      sourcePath: null, targetPath: null, targetIsVideo: false,
+      targetFps: 25, targetDuration: 0, targetTotalFrames: 0,
+      selectedFacePosition: null, selectedFrameNumber: null,
+      swapMode: 'single', pairs: [],
+      speedMode: 'quality', jobId: null, evtSource: null,
+    };
+    document.getElementById('swap-mode').value = 'single';
+    setSwapMode('single');
+    ['source', 'target'].forEach(k => {
+      document.getElementById(`${k}-drop`).classList.remove('filled');
+      document.getElementById(`${k}-input`).value = '';
+    });
+    document.getElementById('source-preview').src = '';
+    document.getElementById('target-preview-img').src = '';
+    document.getElementById('target-preview-vid').src = '';
+    document.getElementById('trim-section').style.display   = 'none';
+    document.getElementById('face-section').style.display   = 'none';
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('result-section').style.display   = 'none';
+    document.getElementById('log-box').innerHTML  = '';
+    document.getElementById('error-banner').style.display = 'none';
+    updateProgress(0, '—');
+    updateStepNumbers(false);
+    clearTrim();
+    resetFaceSelection();
+    checkReady();
+  }
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+</script>
+</body>
+</html>
