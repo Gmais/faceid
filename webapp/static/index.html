@@ -275,6 +275,7 @@
   <div class="logo">🎭</div>
   <h1>FaceSwap Studio</h1>
   <div class="header-right">
+    <button class="btn btn-secondary btn-sm" onclick="changeServer()" title="URL do túnel do seu PC">🔗 Servidor</button>
     <span class="cuda-badge" id="cuda-badge">GPU</span>
     <span class="sub">Powered by FaceFusion · Dados excluídos em 2h</span>
   </div>
@@ -441,7 +442,7 @@
 
 <script>
   // Backend: mesmo servidor quando aberto direto; na Vercel usa a URL do túnel (?api=URL, salva no navegador).
-  const API = (() => {
+  let API = (() => {
     const q = new URLSearchParams(location.search).get('api');
     try {
       if (q) localStorage.setItem('api_base', q);
@@ -462,6 +463,23 @@
     speedMode: 'quality',
     jobId: null, evtSource: null,
   };
+
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(location.hostname) || /^192\.168\./.test(location.hostname);
+
+  function changeServer() {
+    const v = prompt('URL do túnel do seu PC (ex.: https://algo.trycloudflare.com):', API);
+    if (v === null) return;
+    try { localStorage.setItem('api_base', v.trim().replace(/\/+$/, '')); } catch (_) {}
+    location.reload();
+  }
+
+  // Na Vercel não existe backend: sem URL do túnel, nenhuma chamada pode funcionar.
+  function ensureServer() {
+    if (API || isLocalHost) return true;
+    alert('Informe primeiro a URL do túnel do seu PC (botão 🔗 Servidor).');
+    changeServer();
+    return false;
+  }
 
   // ── Server status ──
   fetch(`${API}/api/status`).then(r => r.json()).then(d => {
@@ -486,6 +504,7 @@
   });
 
   async function handleFile(kind, file) {
+    if (!ensureServer()) return;
     const wrap    = document.getElementById(`${kind}-wrap`);
     const spinner = document.getElementById(`${kind}-spinner`);
     wrap.classList.add('uploading');
